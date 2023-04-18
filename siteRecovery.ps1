@@ -1,9 +1,10 @@
+
 # Get details of the virtual machine
 # $vms = @("hastus-front-1", "hastus-front-2")
-$vm = Get-AzVM -ResourceGroupName "hastus" -Name "hastus-front-1"
+$vm = Get-AzVM -ResourceGroupName "hastus" -Name "hastus-back-01"
 
 #Get the vault
-$vault = Get-AzRecoveryServicesVault -Name hastus-rv -ResourceGroupName hastus
+$vault = Get-AzRecoveryServicesVault -Name 'hastus-zone' -ResourceGroupName hastus
 
 #Setting the vault context.
 Set-AzRecoveryServicesAsrVaultContext -Vault $vault
@@ -97,7 +98,7 @@ $hastusReverseZoneProtectionMapping = Get-AzRecoveryServicesAsrProtectionContain
 #Create Cache storage account for replication logs in the primary region
 # $hastusCacheStorageAccount = New-AzStorageAccount -Name "hastusreplicache" -ResourceGroupName "hastus" -Location 'West Europe' -SkuName Standard_LRS -Kind Storage
 
-$hastusCacheStorageAccount = Get-AzStorageAccount -ResourceGroupName "hastus" -Name "hastusreplicache"
+$hastusCacheStorageAccount = Get-AzStorageAccount -ResourceGroupName "hastus" -Name "cjclvihastusasrcache"
 
 #Get the resource group that the virtual machine must be created in when failed over.
 $RecoveryRG = Get-AzResourceGroup -Name "hastus-dest" -Location "West Europe"
@@ -109,7 +110,7 @@ $OSdiskId = $vm.StorageProfile.OsDisk.ManagedDisk.Id
 # $RecoveryOSDiskAccountType = $vm.StorageProfile.OsDisk.ManagedDisk.StorageAccountType
 $RecoveryOSDiskAccountType = "StandardSSD_LRS"
 # $RecoveryReplicaDiskAccountType = $vm.StorageProfile.OsDisk.ManagedDisk.StorageAccountType
-$RecoveryReplicaDiskAccountType = "StandardSSD_RS"
+$RecoveryReplicaDiskAccountType = "StandardSSD_LRS"
 
 
 $OSDiskReplicationConfig = New-AzRecoveryServicesAsrAzureToAzureDiskReplicationConfig -ManagedDisk -LogStorageAccountId $hastusCacheStorageAccount.Id `
@@ -122,4 +123,4 @@ $diskconfigs = @()
 $diskconfigs += $OSDiskReplicationConfig
 
 #Start replication by creating replication protected item. Using a GUID for the name of the replication protected item to ensure uniqueness of name.
-$TempASRJob = New-AzRecoveryServicesAsrReplicationProtectedItem -AzureToAzure -AzureVmId $VM.Id -Name (New-Guid).Guid -ProtectionContainerMapping $hastusZoneProtectionMapping -AzureToAzureDiskReplicationConfiguration $diskconfigs -RecoveryResourceGroupId $RecoveryRG.ResourceId -RecoveryAvailabilitySetId "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/HASTUS-DEST/providers/Microsoft.Compute/availabilitySets/hastus-dest-front" -RecoveryProximityPlacementGroupId "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus-dest/providers/Microsoft.Compute/proximityPlacementGroups/hastus-dest-ppg"
+$TempASRJob = New-AzRecoveryServicesAsrReplicationProtectedItem -AzureToAzure -AzureVmId $VM.Id -Name (New-Guid).Guid -ProtectionContainerMapping $hastusZoneProtectionMapping -AzureToAzureDiskReplicationConfiguration $diskconfigs -RecoveryResourceGroupId $RecoveryRG.ResourceId -RecoveryVirtualMachineScaleSetId "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus-dest/providers/Microsoft.Compute/virtualMachineScaleSets/hastus-backend-zone" -RecoveryAvailabilityZone 2
