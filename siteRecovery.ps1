@@ -51,7 +51,7 @@ while (($TempASRJob.State -eq "InProgress") -or ($TempASRJob.State -eq "NotStart
 
 Write-Output $TempASRJob.State
 
-$RecoveryProtContainer = Get-AzRecoveryServicesAsrProtectionContainer -Fabric $RecoveryFabric -Name "hastus-front-1-we-destination-container"
+$&rotContainer = Get-AzRecoveryServicesAsrProtectionContainer -Fabric $RecoveryFabric -Name "hastus-front-1-we-destination-container"
 
 #Create replication policy
 $TempASRJob = New-AzRecoveryServicesAsrPolicy -AzureToAzure -Name "hastus-front-1-policy" -RecoveryPointRetentionInHours 24 -ApplicationConsistentSnapshotFrequencyInHours 4
@@ -98,29 +98,16 @@ $hastusReverseZoneProtectionMapping = Get-AzRecoveryServicesAsrProtectionContain
 #Create Cache storage account for replication logs in the primary region
 # $hastusCacheStorageAccount = New-AzStorageAccount -Name "hastusreplicache" -ResourceGroupName "hastus" -Location 'West Europe' -SkuName Standard_LRS -Kind Storage
 
-$hastusCacheStorageAccount = Get-AzStorageAccount -ResourceGroupName "hastus" -Name "cjclvihastusasrcache"
-
-#Get the resource group that the virtual machine must be created in when failed over.
-$RecoveryRG = Get-AzResourceGroup -Name "hastus-dest" -Location "West Europe"
-
-#Specify replication properties for each disk of the VM that is to be replicated (create disk replication configuration)
-
-#OsDisk
-$OSdiskId = $vm.StorageProfile.OsDisk.ManagedDisk.Id
-# $RecoveryOSDiskAccountType = $vm.StorageProfile.OsDisk.ManagedDisk.StorageAccountType
-$RecoveryOSDiskAccountType = "StandardSSD_LRS"
-# $RecoveryReplicaDiskAccountType = $vm.StorageProfile.OsDisk.ManagedDisk.StorageAccountType
-$RecoveryReplicaDiskAccountType = "StandardSSD_LRS"
-
-
-$OSDiskReplicationConfig = New-AzRecoveryServicesAsrAzureToAzureDiskReplicationConfig -ManagedDisk -LogStorageAccountId $hastusCacheStorageAccount.Id `
-         -DiskId $OSdiskId -RecoveryResourceGroupId  $RecoveryRG.ResourceId -RecoveryReplicaDiskAccountType  $RecoveryReplicaDiskAccountType `
-         -RecoveryTargetDiskAccountType $RecoveryOSDiskAccountType
-
-
-#Create a list of disk replication configuration objects for the disks of the virtual machine that are to be replicated.
-$diskconfigs = @()
-$diskconfigs += $OSDiskReplicationConfig
+ 
 
 #Start replication by creating replication protected item. Using a GUID for the name of the replication protected item to ensure uniqueness of name.
-$TempASRJob = New-AzRecoveryServicesAsrReplicationProtectedItem -AzureToAzure -AzureVmId $VM.Id -Name (New-Guid).Guid -ProtectionContainerMapping $hastusZoneProtectionMapping -AzureToAzureDiskReplicationConfiguration $diskconfigs -RecoveryResourceGroupId $RecoveryRG.ResourceId -RecoveryVirtualMachineScaleSetId "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus-dest/providers/Microsoft.Compute/virtualMachineScaleSets/hastus-backend-zone" -RecoveryAvailabilityZone 2
+$TempASRJob = New-AzRecoveryServicesAsrReplicationProtectedItem -AzureToAzure -AzureVmId $VM.Id -Name (New-Guid).Guid -ProtectionContainerMapping $hastusZoneProtectionMapping -AzureToAzureDiskReplicationConfiguration $diskconfigs -RecoveryResourceGroupId $RecoveryRG.ResourceId -RecoveryVirtualMachineScaleSetId "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus-dest/providers/Microsoft.Compute/virtualMachineScaleSets/hastus-backend-zone" -RecoveryAvailabilityZone 2 
+
+
+#Reprotect Virtual Machine once failed over
+$cacheStorageId = "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus/providers/Microsoft.Storage/storageAccounts/k209fjhastuszonasrcache"
+$recoveryProtectedItem = Get-AzRecoveryServicesAsrReplicationProtectedItem -ProtectionContainer $RecoveryProtContainer 
+$recoveryResourceGroupId = "/subscriptions/68be309e-79c1-483f-886f-0351d776e20c/resourceGroups/hastus-dest"
+
+$currentJob = Update-AzRecoveryServicesAsrProtectionDirection -AzureToAzure -ProtectionContainerMapping $hastusZoneProtectionMapping -LogStorageAccountId $cacheStorageId `
+ -ReplicationProtectedItem $recoveryProtectedItem -RecoveryResourceGroupId $recoveryResourceGroupId
